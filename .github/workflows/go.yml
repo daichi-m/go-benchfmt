@@ -1,0 +1,59 @@
+name: Go Build
+
+on:
+  push:
+    branches:
+      - "development"
+  pull_request:
+    branches:
+      - "main"
+      - "development"
+
+jobs:
+  build:
+    name: Build
+    strategy:
+      fail-fast: true
+      matrix:
+        os:
+          - ubuntu-latest
+        go:
+          - "1.18"
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v2
+
+      - name: Set up Go
+        uses: actions/setup-go@v2
+        with:
+          go-version: ${{ matrix.go }}
+
+      - name: Lint the code
+        uses: golangci/golangci-lint-action@v2
+        with:
+          version: latest
+        continue-on-error: true
+
+      - name: Format code
+        run: |
+          go install golang.org/x/tools/cmd/goimports@latest
+          goimports -w  .
+
+      - name: Vet
+        run: go vet -v ./...
+
+      - name: Build
+        run: go build -v ./...
+
+      - name: Test and Coverage Report
+        run: go test -race -covermode=atomic -coverprofile=coverage.out ./...
+
+      - name: Cyclomatic complexity
+        run: |
+          go install github.com/fzipp/gocyclo/cmd/gocyclo@latest
+          gocyclo -avg -over 15 .
+
+      - name: Upload code coverage
+        uses: codecov/codecov-action@v1
+        with:
+          fail_ci_if_error: true
